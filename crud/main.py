@@ -80,18 +80,20 @@ async def get_post(id:int,response: Response):
 
 @app.delete("/posts/{id}",status_code=status.HTTP_204_NO_CONTENT)
 async def delete_post(id:int):
-   cursor.execute("""DELETE FROM posts WHERE id = %s RETURNING *""",(str(id)))
+   cursor.execute("""DELETE FROM posts WHERE id = %s RETURNING *""",(str(id),))
    deleted_post = cursor.fetchone()
    conn.commit()
-   if delete_post == None:
+   if deleted_post == None:
        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id: {id} not found")    
    return Response(status_code=status.HTTP_204_NO_CONTENT)
+
+
+
 @app.put("/posts/{id}")
 async def update_post(id:int,new_post:Post):
-    new_post = new_post.model_dump()
-    new_post['id'] = id
-    for i,p in enumerate(my_posts):
-        if p['id']==id:
-            my_posts[i] = new_post
-            return {'messsage' : f"post with id : {id} is updated"}
-    raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id: {id} not found") 
+    cursor.execute(""" UPDATE posts SET title = %s,content = %s, published = %s WHERE id = %s RETURNING *""",(new_post.title, new_post.content, new_post.published,str(id),))
+    updated_post = cursor.fetchone()
+    conn.commit()
+    if updated_post == None:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"post with id: {id} not found") 
+    return {"data": updated_post}
