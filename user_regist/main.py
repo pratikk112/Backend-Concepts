@@ -8,11 +8,10 @@ from psycopg2.extras import RealDictCursor
 import os
 import time 
 from sqlalchemy.orm import Session
-
+from .utils import hash
 
 from . import models,schemas
 from .database import engine  ,Base, get_db
-Base.metadata.create_all(bind=engine)
 
 
 
@@ -21,7 +20,10 @@ db_user = os.getenv("PG_USER")
 db_pw = os.getenv("PG_PW")
 db_name = os.getenv('PG_DB_NAME')
 db_host = os.getenv('PG_DB_HOST')
- 
+
+
+
+Base.metadata.create_all(bind=engine)
 app = FastAPI()
 
 
@@ -111,3 +113,30 @@ async def update_post(id:int,new_post:schemas.PostCreate,db:Session = Depends(ge
     db.commit()
     
     return post
+
+
+@app.post("/users", status_code=status.HTTP_201_CREATED,response_model=schemas.UserOut)
+def create_user(user:schemas.UserCreate, db:Session=Depends(get_db)):
+    
+    check_user = db.query(models.User).filter(models.User.email==user.email).first()
+    if check_user != None:
+        raise HTTPException(status_code=status.HTTP_226_IM_USED,detail=f"email : {user.email} already in use")
+    # hashing password
+    hashed_password = hash(user.password)
+    user.password = hashed_password
+    
+    new_user = models.User(**user.model_dump())
+    db.add(new_user)
+    db.commit()
+    db.refresh(new_user)
+    
+    return new_user
+
+@app.get("/users/{id}", response_model= schemas.UserOut)
+def get_user(id:int, db: Session = Depends(get_db)):
+    user = db.query(models.User).filter(models.User.id == id).first()
+    
+    if not user:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND,detail=f"user with id : {id} not found")
+    
+    return user
